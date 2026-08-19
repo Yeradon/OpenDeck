@@ -134,7 +134,7 @@ async fn init(device: AsyncStreamDeck, device_id: String) {
 		return;
 	}
 
-	let device_name = device.product().await.unwrap();
+	let device_name = device.product().await.unwrap_or_else(|_| "Stream Deck".into());
 	let kind = device.kind();
 	let device_type = match kind {
 		Kind::Original | Kind::OriginalV2 | Kind::Mk2 | Kind::Mk2Scissor | Kind::Mk2Module => 0,
@@ -238,14 +238,15 @@ static MDNS_DISCOVERY_STARTED: std::sync::atomic::AtomicBool = std::sync::atomic
 
 /// Connects directly to a Stream Deck attached to a Network Dock over TCP.
 pub async fn connect_network_device(addr: &str) -> anyhow::Result<()> {
-	log::info!("Connecting to Elgato Network Dock at {addr}...");
-	let device = elgato_streamdeck::AsyncStreamDeck::connect_network(addr)?;
+	let addr_owned = addr.to_owned();
+	let device = tokio::task::spawn_blocking(move || elgato_streamdeck::AsyncStreamDeck::connect_network(&addr_owned)).await??;
 	let serial = device.serial_number().await.unwrap_or_else(|_| "network".into());
 	let device_id = format!("sd-{serial}");
 	if ELGATO_DEVICES.read().await.contains_key(&device_id) {
-		log::info!("Device {device_id} already registered");
+		log::debug!("Device {device_id} already registered");
 		return Ok(());
 	}
+	log::info!("Successfully connected to Elgato Network Dock at {addr} (device {device_id})");
 	tokio::spawn(init(device, device_id));
 	Ok(())
 }
@@ -278,7 +279,6 @@ fn discover_network_docks() {
 					log::info!("Attempting Network Dock connection to {addr}...");
 					match connect_network_device(&addr).await {
 						Ok(_) => {
-							log::info!("Successfully connected to Network Dock at {addr}");
 							break;
 						}
 						Err(e) => {
@@ -305,6 +305,9 @@ pub async fn initialise_devices() {
 
 	// Start background mDNS discovery for Network Docks
 	discover_network_docks();
+
+	// Check local Network Dock endpoint
+	let _ = connect_network_device("127.0.0.1:5343").await;
 
 	// Iterate through detected Elgato devices and attempt to register them.
 	let current = HIDAPI.read().await.as_ref().cloned();
