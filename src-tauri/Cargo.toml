@@ -20,7 +20,8 @@ serde_json = "1.0"
 tokio = { version = "1.48", features = ["full"] }
 tokio-tungstenite = "0.28"
 tiny_http = "0.12"
-elgato-streamdeck = { version = "0.13", default-features = false, features = ["async"] }
+elgato-streamdeck = { git = "https://github.com/Humble-Robotics/rust-elgato-streamdeck", rev = "886e73dc01e2882e1bcc4cb8a35f134f4c882b3b", default-features = false, features = ["async", "tcp"] }
+mdns-sd = "0.21"
 hidapi = "2.6"
 image = { version = "0.25", default-features = false, features = ["bmp", "jpeg"] }
 streamdeck-strip-render = { git = "https://github.com/FrostyCoolSlug/streamdeck-strip-render", rev = "23fa1399" }

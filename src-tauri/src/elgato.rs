@@ -234,6 +234,54 @@ async fn init(device: AsyncStreamDeck, device_id: String) {
 		.unwrap();
 }
 
+static MDNS_DISCOVERY_STARTED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// Connects directly to a Stream Deck attached to a Network Dock over TCP.
+pub async fn connect_network_device(addr: &str) -> anyhow::Result<()> {
+	log::info!("Connecting to Elgato Network Dock at {addr}...");
+	let device = elgato_streamdeck::AsyncStreamDeck::connect_network(addr)?;
+	let serial = device.serial_number().await.unwrap_or_else(|_| "network".into());
+	let device_id = format!("sd-{serial}");
+	if ELGATO_DEVICES.read().await.contains_key(&device_id) {
+		log::info!("Device {device_id} already registered");
+		return Ok(());
+	}
+	tokio::spawn(init(device, device_id));
+	Ok(())
+}
+
+/// Spawns background mDNS browsing to discover Network Docks on the local network.
+fn discover_network_docks() {
+	if MDNS_DISCOVERY_STARTED.swap(true, std::sync::atomic::Ordering::SeqCst) {
+		return;
+	}
+
+	tokio::spawn(async {
+		let Ok(daemon) = mdns_sd::ServiceDaemon::new() else {
+			log::warn!("Failed to initialize mDNS daemon for Network Dock discovery");
+			return;
+		};
+		let service_type = "_elg._tcp.local.";
+		let Ok(receiver) = daemon.browse(service_type) else {
+			log::warn!("Failed to browse for _elg._tcp services");
+			return;
+		};
+
+		log::info!("Started background mDNS discovery for Elgato Network Docks");
+		while let Ok(event) = receiver.recv_async().await {
+			if let mdns_sd::ServiceEvent::ServiceResolved(info) = event {
+				let port = info.get_port();
+				for ip in info.get_addresses() {
+					let addr = format!("{}:{}", ip, port);
+					if let Err(e) = connect_network_device(&addr).await {
+						log::debug!("Failed to connect to discovered network dock at {addr}: {e}");
+					}
+				}
+			}
+		}
+	});
+}
+
 /// Attempt to initialise all connected devices.
 pub async fn initialise_devices() {
 	if crate::store::get_settings().value.disableelgato {
@@ -245,6 +293,9 @@ pub async fn initialise_devices() {
 	} else {
 		crate::plugins::DEVICE_NAMESPACES.write().await.remove("sd");
 	}
+
+	// Start background mDNS discovery for Network Docks
+	discover_network_docks();
 
 	// Iterate through detected Elgato devices and attempt to register them.
 	let current = HIDAPI.read().await.as_ref().cloned();
