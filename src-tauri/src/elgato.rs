@@ -271,10 +271,19 @@ fn discover_network_docks() {
 		while let Ok(event) = receiver.recv_async().await {
 			if let mdns_sd::ServiceEvent::ServiceResolved(info) = event {
 				let port = info.get_port();
+				log::info!("Discovered mDNS Elgato service: {} at port {port}", info.get_fullname());
 				for ip in info.get_addresses() {
-					let addr = format!("{}:{}", ip, port);
-					if let Err(e) = connect_network_device(&addr).await {
-						log::debug!("Failed to connect to discovered network dock at {addr}: {e}");
+					let socket_addr = std::net::SocketAddr::new(ip.to_ip_addr(), port);
+					let addr = socket_addr.to_string();
+					log::info!("Attempting Network Dock connection to {addr}...");
+					match connect_network_device(&addr).await {
+						Ok(_) => {
+							log::info!("Successfully connected to Network Dock at {addr}");
+							break;
+						}
+						Err(e) => {
+							log::warn!("Failed to connect to discovered network dock at {addr}: {e}");
+						}
 					}
 				}
 			}
