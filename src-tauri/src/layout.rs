@@ -198,6 +198,15 @@ pub fn render_layout_preview(instance: &ActionInstance) -> Option<String> {
 	let mut cursor = std::io::Cursor::new(&mut bytes);
 	img.to_rgb8().write_to(&mut cursor, image::ImageFormat::Jpeg).ok()?;
 
+	if instance.context.controller == "Neo" {
+		let debug_path = config_dir().join("neo_infobar_render.jpg");
+		if let Err(err) = std::fs::write(&debug_path, &bytes) {
+			log::warn!("Failed to write debug neo infobar image: {err}");
+		} else {
+			log::info!("Rendered Neo Infobar image written to: {}", debug_path.display());
+		}
+	}
+
 	use base64::Engine;
 	let encoded = base64::engine::general_purpose::STANDARD.encode(&bytes);
 	Some(format!("data:image/jpeg;base64,{encoded}"))
@@ -282,4 +291,42 @@ fn get_layout_image(instance: &mut ActionInstance) -> Result<DynamicImage, anyho
 	renderer.set_title_override(override_title);
 	renderer.set_feedback(Value::Object(feedback))?;
 	Ok(DynamicImage::ImageRgba8(renderer.get_image()))
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+	use image::ImageFormat;
+	use streamdeck_strip_render::get_incremental_renderer_with_size;
+
+	#[test]
+	fn test_render_neo_infobar_sample() -> Result<(), Box<dyn std::error::Error>> {
+		let layout_str = std::fs::read_to_string("/home/user/.config/opendeck/plugins/com.test.neodemo.sdPlugin/layout.json")?;
+		let layout_json: serde_json::Value = serde_json::from_str(&layout_str)?;
+
+		let mut renderer = get_incremental_renderer_with_size(layout_json, None, 232, 50)?;
+		renderer.set_feedback(serde_json::json!({
+			"title": "Neo Infobar Demo",
+			"value": "Ticks: 42",
+			"indicator": "LIVE"
+		}))?;
+
+		let rendered = DynamicImage::ImageRgba8(renderer.get_image());
+		assert_eq!(rendered.width(), 232);
+		assert_eq!(rendered.height(), 50);
+
+		let mut canvas = RgbaImage::from_pixel(248, 58, Rgba([0, 0, 0, 255]));
+		overlay(&mut canvas, &rendered.to_rgba8(), 8, 4);
+
+		let output_path = std::path::Path::new("/home/user/.config/opendeck/neo_infobar_render.jpg");
+		let mut bytes: Vec<u8> = Vec::new();
+		let mut cursor = std::io::Cursor::new(&mut bytes);
+		DynamicImage::ImageRgba8(canvas).to_rgb8().write_to(&mut cursor, ImageFormat::Jpeg)?;
+		std::fs::write(output_path, &bytes)?;
+
+		println!("Rendered Neo Infobar image written to: {}", output_path.display());
+		assert!(output_path.exists());
+		assert!(std::fs::metadata(output_path)?.len() > 0);
+		Ok(())
+	}
 }
