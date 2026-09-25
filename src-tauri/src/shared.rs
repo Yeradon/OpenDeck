@@ -253,7 +253,7 @@ pub struct Encoder {
 	pub layout_parsed: Option<StripRenderer>,
 }
 
-pub fn initialise_encoder_layout(action: &mut Action, layout: Option<String>) -> Result<(), anyhow::Error> {
+pub fn initialise_layout(action: &mut Action, _controller: &str, layout: Option<String>) -> Result<(), anyhow::Error> {
 	let Some(encoder) = action.encoder.as_mut() else { return Ok(()) };
 
 	let load_layout = match layout.unwrap_or_else(|| encoder.layout.clone()) {

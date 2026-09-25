@@ -1,6 +1,6 @@
 use super::Store;
 
-use crate::shared::{ActionInstance, DEVICES, DeviceInfo, Profile, config_dir, copy_dir, initialise_encoder_layout};
+use crate::shared::{ActionInstance, DEVICES, DeviceInfo, Profile, config_dir, copy_dir, initialise_layout};
 
 use std::collections::HashMap;
 use std::fs;
@@ -75,7 +75,7 @@ impl ProfileStores {
 				}
 
 				// Load encoder layout if not yet parsed
-				let _ = initialise_encoder_layout(&mut instance.action, None);
+				let _ = initialise_layout(&mut instance.action, "Encoder", None);
 			}
 
 			store.save()?;

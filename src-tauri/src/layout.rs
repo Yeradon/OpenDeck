@@ -17,7 +17,7 @@ pub async fn generate_encoder_image(context: &crate::shared::Context, fallback: 
 	// We need to borrow the encoder instance to render the image, so we'll take it, then give it back when we're done.
 	let img = if let Some(instance) = slot {
 		if let Some(mut encoder) = instance.action.encoder.take() {
-			let result = get_encoder_image(&mut encoder, instance).context("Failed to render encoder image");
+			let result = get_layout_image(&mut encoder, instance).context("Failed to render encoder image");
 			instance.action.encoder = Some(encoder);
 			Some(result?)
 		} else {
@@ -48,7 +48,7 @@ pub async fn generate_encoder_image(context: &crate::shared::Context, fallback: 
 	}
 }
 
-fn get_encoder_image(encoder: &mut Encoder, instance: &ActionInstance) -> Result<DynamicImage, anyhow::Error> {
+fn get_layout_image(encoder: &mut Encoder, instance: &ActionInstance) -> Result<DynamicImage, anyhow::Error> {
 	let Some(ref mut renderer) = encoder.layout_parsed else {
 		// Something's gone horribly wrong here; we should have a layout. Render a blank image.
 		return Ok(DynamicImage::new_rgb8(200, 100));

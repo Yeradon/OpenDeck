@@ -1,4 +1,4 @@
-use crate::encoder_layouts::generate_encoder_image;
+use crate::layout::generate_encoder_image;
 use crate::events::inbound;
 
 use std::collections::HashMap;
