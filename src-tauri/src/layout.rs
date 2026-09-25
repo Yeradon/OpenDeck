@@ -48,10 +48,68 @@ pub async fn generate_encoder_image(context: &crate::shared::Context, fallback: 
 	}
 }
 
+pub async fn generate_infobar_image(context: &crate::shared::Context, fallback: &[u8]) -> Result<DynamicImage, anyhow::Error> {
+	let mut locks = acquire_locks_mut().await;
+	let slot = get_slot_mut(context, &mut locks).await?;
+
+	let img = if let Some(instance) = slot {
+		if let Some(mut encoder) = instance.action.encoder.take() {
+			let result = if encoder.layout_parsed.is_some() {
+				let rendered = get_layout_image(&mut encoder, instance).context("Failed to render infobar layout")?;
+				// Stream Deck Neo layout canvas is 232x50, physical display is 248x58.
+				// Center the 232x50 layout onto the 248x58 canvas with 8px horizontal and 4px vertical margin.
+				let mut canvas = RgbaImage::from_pixel(248, 58, Rgba([0, 0, 0, 255]));
+				overlay(&mut canvas, &rendered.to_rgba8(), 8, 4);
+				Some(DynamicImage::ImageRgba8(canvas))
+			} else {
+				None
+			};
+			instance.action.encoder = Some(encoder);
+			result
+		} else {
+			None
+		}
+	} else {
+		None
+	};
+	drop(locks);
+
+	match img {
+		Some(img) => Ok(img),
+		None => {
+			let fallback_img = image::load_from_memory(fallback)
+				.context("Failed to decode fallback image")?
+				.resize_exact(248, 58, image::imageops::FilterType::Lanczos3);
+			Ok(fallback_img)
+		}
+	}
+}
+
+pub fn render_infobar_preview(instance: &ActionInstance) -> Option<String> {
+	let encoder = instance.action.encoder.as_ref()?;
+	if encoder.layout_parsed.is_none() {
+		return None;
+	}
+	let mut encoder_clone = encoder.clone();
+	let rendered = get_layout_image(&mut encoder_clone, instance).ok()?;
+	let mut canvas = RgbaImage::from_pixel(248, 58, Rgba([0, 0, 0, 255]));
+	overlay(&mut canvas, &rendered.to_rgba8(), 8, 4);
+
+	let mut bytes: Vec<u8> = Vec::new();
+	let mut cursor = std::io::Cursor::new(&mut bytes);
+	DynamicImage::ImageRgba8(canvas).to_rgb8().write_to(&mut cursor, image::ImageFormat::Jpeg).ok()?;
+
+	use base64::Engine;
+	let encoded = base64::engine::general_purpose::STANDARD.encode(&bytes);
+	Some(format!("data:image/jpeg;base64,{encoded}"))
+}
+
 fn get_layout_image(encoder: &mut Encoder, instance: &ActionInstance) -> Result<DynamicImage, anyhow::Error> {
+	let is_infobar = instance.context.controller == "Infobar" || instance.context.controller == "Neo";
+	let (w, h) = if is_infobar { (232, 50) } else { (200, 100) };
 	let Some(ref mut renderer) = encoder.layout_parsed else {
 		// Something's gone horribly wrong here; we should have a layout. Render a blank image.
-		return Ok(DynamicImage::new_rgb8(200, 100));
+		return Ok(DynamicImage::new_rgb8(w, h));
 	};
 
 	let path = config_dir().join("plugins").join(&instance.action.plugin);

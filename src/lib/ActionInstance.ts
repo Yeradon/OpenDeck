@@ -8,4 +8,5 @@ export type ActionInstance = {
 	current_state: number;
 	settings: any;
 	children: ActionInstance[] | null;
+	layout_image?: string | null;
 };

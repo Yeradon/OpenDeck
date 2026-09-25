@@ -33,7 +33,7 @@
 
 	async function handleDrop({ dataTransfer }: DragEvent, controller: string, position: number) {
 		let context = { device: device.id, profile: profile.id, controller, position };
-		let array = controller == "Encoder" ? profile.sliders : controller == "Infobar" ? profile.infobars : profile.keys;
+		let array = controller == "Encoder" ? profile.sliders : controller == "Infobar" || controller == "Neo" ? profile.infobars : profile.keys;
 		if (dataTransfer?.getData("action")) {
 			let action = JSON.parse(dataTransfer?.getData("action"));
 			if (array[position]) {
@@ -43,7 +43,7 @@
 			profile = profile;
 		} else if (dataTransfer?.getData("controller")) {
 			let oldController = dataTransfer?.getData("controller");
-			let oldArray = oldController == "Encoder" ? profile.sliders : oldController == "Infobar" ? profile.infobars : profile.keys;
+			let oldArray = oldController == "Encoder" ? profile.sliders : oldController == "Infobar" || oldController == "Neo" ? profile.infobars : profile.keys;
 			let oldPosition = parseInt(dataTransfer?.getData("position"));
 			let response: ActionInstance = await invoke("move_instance", {
 				source: { device: device.id, profile: profile.id, controller: oldController, position: oldPosition },
@@ -59,7 +59,7 @@
 	}
 
 	async function handlePaste(item: CopiedItem, destination: Context) {
-		let array = destination.controller == "Encoder" ? profile.sliders : destination.controller == "Infobar" ? profile.infobars : profile.keys;
+		let array = destination.controller == "Encoder" ? profile.sliders : destination.controller == "Infobar" || destination.controller == "Neo" ? profile.infobars : profile.keys;
 
 		if (item.type == "action") {
 			if (array[destination.position]) return;

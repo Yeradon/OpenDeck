@@ -7,12 +7,19 @@ use tauri::{AppHandle, Emitter, Manager, command};
 use tokio::fs::remove_dir_all;
 
 #[command]
-pub async fn create_instance(app: AppHandle, mut action: Action, context: Context) -> Result<Option<ActionInstance>, Error> {
-	if !action.controllers.contains(&context.controller) {
+pub async fn create_instance(app: AppHandle, mut action: Action, mut context: Context) -> Result<Option<ActionInstance>, Error> {
+	if !action.supports_controller(&context.controller) {
 		return Ok(None);
 	}
 
-	if context.controller == "Encoder" {
+	if context.controller == "Infobar" || context.controller == "Neo" {
+		context.controller = if action.controllers.iter().any(|c| c == "Neo") {
+			"Neo".to_string()
+		} else {
+			"Infobar".to_string()
+		};
+		let _ = crate::shared::initialise_layout(&mut action, &context.controller, None);
+	} else if context.controller == "Encoder" {
 		let _ = crate::shared::initialise_layout(&mut action, &context.controller, None);
 	}
 
@@ -33,6 +40,7 @@ pub async fn create_instance(app: AppHandle, mut action: Action, context: Contex
 			current_state: 0,
 			settings: serde_json::Value::Object(serde_json::Map::new()),
 			children: None,
+			layout_image: None,
 		};
 		children.push(instance.clone());
 
@@ -52,7 +60,7 @@ pub async fn create_instance(app: AppHandle, mut action: Action, context: Contex
 		let slot = get_slot(&context, &locks).await?.clone();
 		Ok(slot)
 	} else {
-		let instance = ActionInstance {
+		let mut instance = ActionInstance {
 			action: action.clone(),
 			context: ActionContext::from_context(context.clone(), 0),
 			states: action.states.clone(),
@@ -63,7 +71,11 @@ pub async fn create_instance(app: AppHandle, mut action: Action, context: Contex
 			} else {
 				None
 			},
+			layout_image: None,
 		};
+		if context.controller == "Infobar" || context.controller == "Neo" {
+			instance.layout_image = crate::layout::render_infobar_preview(&instance);
+		}
 
 		*slot = Some(instance.clone());
 		let slot = slot.clone();
@@ -85,7 +97,8 @@ fn instance_images_dir(context: &ActionContext) -> std::path::PathBuf {
 
 #[command]
 pub async fn move_instance(source: Context, destination: Context, retain: bool) -> Result<Option<ActionInstance>, Error> {
-	if source.controller != destination.controller {
+	let is_display_slot = |c: &str| c == "Infobar" || c == "Neo";
+	if source.controller != destination.controller && !(is_display_slot(&source.controller) && is_display_slot(&destination.controller)) {
 		return Ok(None);
 	}
 
@@ -217,6 +230,11 @@ struct UpdateStateEvent {
 
 pub async fn update_state(app: &AppHandle, context: ActionContext, locks: &mut LocksMut<'_>) -> Result<(), anyhow::Error> {
 	let window = app.get_webview_window("main").unwrap();
+	if let Some(instance) = get_instance_mut(&context, locks).await? {
+		if instance.context.controller == "Infobar" || instance.context.controller == "Neo" {
+			instance.layout_image = crate::layout::render_infobar_preview(instance);
+		}
+	}
 	window.emit(
 		"update_state",
 		UpdateStateEvent {

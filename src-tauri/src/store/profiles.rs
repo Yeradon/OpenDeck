@@ -317,7 +317,7 @@ pub async fn get_slot<'a>(context: &crate::shared::Context, locks: &'a Locks<'_>
 
 	let configured = match &context.controller[..] {
 		"Encoder" => store.value.sliders.get(context.position as usize).ok_or_else(|| anyhow!("index out of bounds"))?,
-		"Infobar" => store.value.infobars.get(context.position as usize).ok_or_else(|| anyhow!("index out of bounds"))?,
+		"Infobar" | "Neo" => store.value.infobars.get(context.position as usize).ok_or_else(|| anyhow!("index out of bounds"))?,
 		_ => store.value.keys.get(context.position as usize).ok_or_else(|| anyhow!("index out of bounds"))?,
 	};
 
@@ -330,7 +330,7 @@ pub async fn get_slot_mut<'a>(context: &crate::shared::Context, locks: &'a mut L
 
 	let configured = match &context.controller[..] {
 		"Encoder" => store.value.sliders.get_mut(context.position as usize).ok_or_else(|| anyhow!("index out of bounds"))?,
-		"Infobar" => store.value.infobars.get_mut(context.position as usize).ok_or_else(|| anyhow!("index out of bounds"))?,
+		"Infobar" | "Neo" => store.value.infobars.get_mut(context.position as usize).ok_or_else(|| anyhow!("index out of bounds"))?,
 		_ => store.value.keys.get_mut(context.position as usize).ok_or_else(|| anyhow!("index out of bounds"))?,
 	};
 

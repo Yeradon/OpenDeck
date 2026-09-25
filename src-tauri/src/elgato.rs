@@ -57,6 +57,13 @@ pub async fn update_image(context: &crate::shared::Context, image: Option<&str>)
 				};
 				let data = convert_image_with_format_async(format, img.resize_exact(248, 58, image::imageops::FilterType::Lanczos3))?;
 				device.write_lcd_fill(&data).await?;
+			} else if context.controller == "Neo" {
+				let img = crate::layout::generate_infobar_image(context, &bytes).await?;
+				let Some(format) = device.kind().lcd_image_format() else {
+					return Err(anyhow::anyhow!("Failed to get LCD image format"));
+				};
+				let data = convert_image_with_format_async(format, img)?;
+				device.write_lcd_fill(&data).await?;
 			} else if is_touch_point {
 				let (r, g, b) = extract_average_colour(&image::load_from_memory(&bytes)?);
 				device.set_touchpoint_color(context.position - key_count, r, g, b).await?;
@@ -76,6 +83,12 @@ pub async fn update_image(context: &crate::shared::Context, image: Option<&str>)
 			};
 			device.write_lcd(context.position as u16 * 200, 0, &ImageRect::from_image_async(img)?).await?;
 		} else if context.controller == "Infobar" {
+			let Some(format) = device.kind().lcd_image_format() else {
+				return Err(anyhow::anyhow!("Failed to get LCD image format"));
+			};
+			let data = convert_image_with_format_async(format, image::DynamicImage::new_rgb8(248, 58))?;
+			device.write_lcd_fill(&data).await?;
+		} else if context.controller == "Neo" {
 			let Some(format) = device.kind().lcd_image_format() else {
 				return Err(anyhow::anyhow!("Failed to get LCD image format"));
 			};

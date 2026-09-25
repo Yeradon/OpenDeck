@@ -8,7 +8,7 @@ use serde_inline_default::serde_inline_default;
 
 use anyhow::{Result, bail};
 use dashmap::DashMap;
-use streamdeck_strip_render::{get_incremental_renderer, strip_renderer::StripRenderer};
+use streamdeck_strip_render::{get_incremental_renderer_with_size, strip_renderer::StripRenderer};
 use tauri::Manager;
 use tokio::sync::RwLock;
 
@@ -227,6 +227,20 @@ pub struct Action {
 	pub states: Vec<ActionState>,
 }
 
+impl Action {
+	/// Check if this action supports the specified controller slot.
+	///
+	/// The Stream Deck Neo display slot supports both official `"Neo"` actions
+	/// and legacy OpenDeck `"Infobar"` actions.
+	pub fn supports_controller(&self, slot_controller: &str) -> bool {
+		if slot_controller == "Infobar" || slot_controller == "Neo" {
+			self.controllers.iter().any(|c| c == "Neo" || c == "Infobar")
+		} else {
+			self.controllers.iter().any(|c| c == slot_controller)
+		}
+	}
+}
+
 /// An encoder, deserialised from the plugin manifest.
 #[serde_inline_default]
 #[derive(Clone, Serialize, Deserialize)]
@@ -253,11 +267,40 @@ pub struct Encoder {
 	pub layout_parsed: Option<StripRenderer>,
 }
 
-pub fn initialise_layout(action: &mut Action, _controller: &str, layout: Option<String>) -> Result<(), anyhow::Error> {
-	let Some(encoder) = action.encoder.as_mut() else { return Ok(()) };
+pub fn initialise_layout(action: &mut Action, controller: &str, layout: Option<String>) -> Result<(), anyhow::Error> {
+	let encoder = match action.encoder.as_mut() {
+		Some(encoder) => encoder,
+		None => {
+			if layout.is_none() && controller != "Encoder" {
+				return Ok(());
+			}
+			action.encoder = Some(Encoder {
+				icon: String::new(),
+				stack_color: String::new(),
+				trigger_description: TriggerDescription::default(),
+				background: String::new(),
+				layout: String::new(),
+				layout_parsed: None,
+			});
+			action.encoder.as_mut().unwrap()
+		}
+	};
+
+	let is_infobar = controller == "Infobar" || controller == "Neo";
+	let (width, height) = if is_infobar {
+		(232, 50)
+	} else {
+		(200, 100)
+	};
 
 	let load_layout = match layout.unwrap_or_else(|| encoder.layout.clone()) {
-		s if s.is_empty() => "$X1".to_string(),
+		s if s.is_empty() => {
+			if is_infobar {
+				encoder.layout_parsed = None;
+				return Ok(());
+			}
+			"$X1".to_string()
+		}
 		s => s,
 	};
 
@@ -285,7 +328,7 @@ pub fn initialise_layout(action: &mut Action, _controller: &str, layout: Option<
 	};
 
 	match load_encoder_layout(&layout) {
-		Ok(parsed) => encoder.layout_parsed = Some(get_incremental_renderer(parsed, None)?),
+		Ok(parsed) => encoder.layout_parsed = Some(get_incremental_renderer_with_size(parsed, None, width, height)?),
 		Err(error) => {
 			encoder.layout_parsed = None;
 			bail!("Failed to load encoder layout {}: {}", load_layout, error)
@@ -430,6 +473,8 @@ pub struct ActionInstance {
 	pub current_state: u16,
 	pub settings: serde_json::Value,
 	pub children: Option<Vec<ActionInstance>>,
+	#[serde(default, skip_serializing_if = "Option::is_none")]
+	pub layout_image: Option<String>,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
