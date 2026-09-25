@@ -292,6 +292,27 @@ If you have already donated, thank you so much for your support!"#,
 				});
 			}
 
+			tokio::spawn(async {
+				tokio::time::sleep(Duration::from_millis(500)).await;
+				let _ = crate::events::inbound::devices::register_device(
+					"",
+					crate::events::inbound::PayloadEvent {
+						payload: crate::shared::DeviceInfo {
+							id: "sd-virtual-neo".to_string(),
+							plugin: String::new(),
+							name: "Stream Deck Neo (Virtual)".to_string(),
+							rows: 2,
+							columns: 4,
+							encoders: 0,
+							touchpoints: 2,
+							infobars: 1,
+							r#type: 9,
+						},
+					},
+				)
+				.await;
+			});
+
 			Ok(())
 		})
 		.plugin(
@@ -391,18 +412,8 @@ If you have already donated, thank you so much for your support!"#,
 
 	app.run(|app, event| {
 		if let tauri::RunEvent::Exit = event {
-			futures::executor::block_on(async {
-				let device_ids = shared::DEVICES.iter().filter(|entry| !entry.id.starts_with("sd-")).map(|entry| entry.id.clone()).collect::<Vec<_>>();
-				for id in device_ids {
-					let _ = events::outbound::devices::clear_screen(id).await;
-				}
-			});
-
 			#[cfg(windows)]
-			{
-				std::thread::sleep(std::time::Duration::from_millis(750));
-				futures::executor::block_on(plugins::deactivate_plugins());
-			}
+			futures::executor::block_on(plugins::deactivate_plugins());
 
 			let flush_future = store::profiles::flush_stale_profiles();
 			match futures::executor::block_on(flush_future) {
