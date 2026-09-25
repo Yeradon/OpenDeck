@@ -1,6 +1,6 @@
 use crate::device_sleep::is_device_sleeping;
-use crate::encoder_layouts::generate_encoder_image;
 use crate::events::inbound;
+use crate::layout::generate_encoder_image;
 
 use std::collections::HashMap;
 use std::sync::Arc;

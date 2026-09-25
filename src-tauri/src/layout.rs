@@ -1,4 +1,4 @@
-use crate::shared::{ActionInstance, Encoder, config_dir};
+use crate::shared::{ActionInstance, config_dir};
 use crate::store::profiles::{acquire_locks_mut, get_slot_mut};
 
 use std::path::{Path, PathBuf};
@@ -14,11 +14,9 @@ pub async fn generate_encoder_image(context: &crate::shared::Context, fallback: 
 	let mut locks = acquire_locks_mut().await;
 	let slot = get_slot_mut(context, &mut locks).await?;
 
-	// We need to borrow the encoder instance to render the image, so we'll take it, then give it back when we're done.
 	let img = if let Some(instance) = slot {
-		if let Some(mut encoder) = instance.action.encoder.take() {
-			let result = get_encoder_image(&mut encoder, instance).context("Failed to render encoder image");
-			instance.action.encoder = Some(encoder);
+		if instance.action.layout_parsed.is_some() {
+			let result = get_layout_image(instance).context("Failed to render encoder image");
 			Some(result?)
 		} else {
 			None
@@ -48,8 +46,8 @@ pub async fn generate_encoder_image(context: &crate::shared::Context, fallback: 
 	}
 }
 
-fn get_encoder_image(encoder: &mut Encoder, instance: &ActionInstance) -> Result<DynamicImage, anyhow::Error> {
-	let Some(ref mut renderer) = encoder.layout_parsed else {
+fn get_layout_image(instance: &mut ActionInstance) -> Result<DynamicImage, anyhow::Error> {
+	let Some(ref mut renderer) = instance.action.layout_parsed else {
 		// Something's gone horribly wrong here; we should have a layout. Render a blank image.
 		return Ok(DynamicImage::new_rgb8(200, 100));
 	};
