@@ -225,6 +225,10 @@ pub struct Action {
 
 	#[serde(alias = "States")]
 	pub states: Vec<ActionState>,
+
+	// Note: this is not a real manifest property; it is only used internally.
+	#[serde(skip)]
+	pub layout_parsed: Option<StripRenderer>,
 }
 
 /// An encoder, deserialised from the plugin manifest.
@@ -247,18 +251,20 @@ pub struct Encoder {
 
 	#[serde_inline_default(String::from("$X1"))]
 	pub layout: String,
-
-	// Note: this is not a real manifest property; it is only used internally.
-	#[serde(skip)]
-	pub layout_parsed: Option<StripRenderer>,
 }
 
-pub fn initialise_encoder_layout(action: &mut Action, layout: Option<String>) -> Result<(), anyhow::Error> {
-	let Some(encoder) = action.encoder.as_mut() else { return Ok(()) };
-
-	let load_layout = match layout.unwrap_or_else(|| encoder.layout.clone()) {
-		s if s.is_empty() => "$X1".to_string(),
-		s => s,
+pub fn initialise_layout(action: &mut Action, _controller: &str, layout: Option<String>) -> Result<(), anyhow::Error> {
+	let layout_default = action.encoder.as_ref().map(|e| e.layout.clone());
+	let load_layout = match layout.or(layout_default) {
+		Some(s) if !s.is_empty() => s,
+		_ => {
+			if action.encoder.is_some() {
+				"$X1".to_string()
+			} else {
+				action.layout_parsed = None;
+				return Ok(());
+			}
+		}
 	};
 
 	let layout = if load_layout.starts_with('$') {
@@ -274,20 +280,20 @@ pub fn initialise_encoder_layout(action: &mut Action, layout: Option<String>) ->
 		match layout_file.canonicalize() {
 			Ok(resolved) if resolved.starts_with(&plugin_dir) => resolved.to_string_lossy().into_owned(),
 			Ok(_) => {
-				encoder.layout_parsed = None;
+				action.layout_parsed = None;
 				bail!("Encoder layout path escapes plugin directory: {}", load_layout);
 			}
 			Err(error) => {
-				encoder.layout_parsed = None;
+				action.layout_parsed = None;
 				bail!("Failed to canonicalize encoder layout path {}: {}", load_layout, error);
 			}
 		}
 	};
 
 	match load_encoder_layout(&layout) {
-		Ok(parsed) => encoder.layout_parsed = Some(get_incremental_renderer(parsed, None)?),
+		Ok(parsed) => action.layout_parsed = Some(get_incremental_renderer(parsed, None)?),
 		Err(error) => {
-			encoder.layout_parsed = None;
+			action.layout_parsed = None;
 			bail!("Failed to load encoder layout {}: {}", load_layout, error)
 		}
 	}

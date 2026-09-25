@@ -13,7 +13,7 @@ pub async fn create_instance(app: AppHandle, mut action: Action, context: Contex
 	}
 
 	if context.controller == "Encoder" {
-		let _ = crate::shared::initialise_encoder_layout(&mut action, None);
+		let _ = crate::shared::initialise_layout(&mut action, &context.controller, None);
 	}
 
 	let mut locks = acquire_locks_mut().await;
