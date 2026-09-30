@@ -182,6 +182,7 @@ impl DiskActionInstance {
 			current_state: self.current_state,
 			settings: self.settings,
 			children: self.children.map(|c| c.into_iter().map(|v| v.into_action_instance(path)).collect()),
+			layout_image: None,
 		}
 	}
 }
