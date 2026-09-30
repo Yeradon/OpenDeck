@@ -20,7 +20,15 @@ pub async fn get_selected_profile(device: String) -> Result<crate::shared::Profi
 	let selected_profile = locks.device_stores.get_selected_profile(&device)?;
 	let profile = locks.profile_stores.get_profile_store(&DEVICES.get(&device).unwrap(), &selected_profile)?;
 
-	Ok(profile.value.clone())
+	let mut profile = profile.value.clone();
+	for infobar in profile.infobars.iter_mut().flatten() {
+		infobar.layout_image = crate::layout::render_layout_preview(infobar);
+	}
+	for slider in profile.sliders.iter_mut().flatten() {
+		slider.layout_image = crate::layout::render_layout_preview(slider);
+	}
+
+	Ok(profile)
 }
 
 #[allow(clippy::flat_map_identity)]
