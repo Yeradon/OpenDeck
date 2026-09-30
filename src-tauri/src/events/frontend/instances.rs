@@ -1,6 +1,6 @@
 use super::Error;
 
-use crate::shared::{Action, ActionContext, ActionInstance, ActionState, Context, config_dir};
+use crate::shared::{Action, ActionContext, ActionInstance, ActionState, Context, config_dir, initialise_layout, supports_dynamic_layout};
 use crate::store::profiles::{LocksMut, acquire_locks, acquire_locks_mut, get_instance_mut, get_slot, get_slot_mut, save_profile_now};
 
 use tauri::{AppHandle, Emitter, Manager, command};
@@ -8,12 +8,12 @@ use tokio::fs::remove_dir_all;
 
 #[command]
 pub async fn create_instance(app: AppHandle, mut action: Action, context: Context) -> Result<Option<ActionInstance>, Error> {
-	if !action.controllers.contains(&context.controller) {
+	if !action.supports_controller(&context.controller) {
 		return Ok(None);
 	}
 
-	if context.controller == "Encoder" {
-		let _ = crate::shared::initialise_layout(&mut action, &context.controller, None);
+	if supports_dynamic_layout(&context.controller) {
+		let _ = initialise_layout(&mut action, &context.controller, None);
 	}
 
 	let mut locks = acquire_locks_mut().await;

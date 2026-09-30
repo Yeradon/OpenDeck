@@ -8,7 +8,7 @@ use serde_inline_default::serde_inline_default;
 
 use anyhow::{Result, bail};
 use dashmap::DashMap;
-use streamdeck_strip_render::{get_incremental_renderer, strip_renderer::StripRenderer};
+use streamdeck_strip_render::{get_incremental_renderer_with_size, strip_renderer::StripRenderer};
 use tauri::Manager;
 use tokio::sync::RwLock;
 
@@ -231,6 +231,21 @@ pub struct Action {
 	pub layout_parsed: Option<StripRenderer>,
 }
 
+/// Check if the specified controller supports dynamic layouts.
+///
+/// Only `"Encoder"` and `"Neo"` use dynamic layout templates via `streamdeck_strip_render`.
+/// Standard `"Keypad"` does not support dynamic layouts.
+pub fn supports_dynamic_layout(controller: &str) -> bool {
+	matches!(controller, "Encoder" | "Neo")
+}
+
+impl Action {
+	/// Check if this action supports the specified controller slot.
+	pub fn supports_controller(&self, slot_controller: &str) -> bool {
+		self.controllers.iter().any(|c| c == slot_controller)
+	}
+}
+
 /// An encoder, deserialised from the plugin manifest.
 #[serde_inline_default]
 #[derive(Clone, Serialize, Deserialize)]
@@ -253,16 +268,33 @@ pub struct Encoder {
 	pub layout: String,
 }
 
-pub fn initialise_layout(action: &mut Action, _controller: &str, layout: Option<String>) -> Result<(), anyhow::Error> {
-	let layout_default = action.encoder.as_ref().map(|e| e.layout.clone());
-	let load_layout = match layout.or(layout_default) {
-		Some(s) if !s.is_empty() => s,
-		_ => {
-			if action.encoder.is_some() {
-				"$X1".to_string()
-			} else {
+pub fn initialise_layout(action: &mut Action, controller: &str, layout: Option<String>) -> Result<(), anyhow::Error> {
+	let is_neo = controller == "Neo";
+	let (width, height) = if is_neo {
+		(232, 50)
+	} else {
+		(200, 100)
+	};
+
+	let load_layout = if is_neo {
+		match layout {
+			Some(s) if !s.is_empty() => s,
+			_ => {
 				action.layout_parsed = None;
 				return Ok(());
+			}
+		}
+	} else {
+		let layout_default = action.encoder.as_ref().map(|e| e.layout.clone());
+		match layout.or(layout_default) {
+			Some(s) if !s.is_empty() => s,
+			_ => {
+				if action.encoder.is_some() {
+					"$X1".to_string()
+				} else {
+					action.layout_parsed = None;
+					return Ok(());
+				}
 			}
 		}
 	};
@@ -291,7 +323,7 @@ pub fn initialise_layout(action: &mut Action, _controller: &str, layout: Option<
 	};
 
 	match load_encoder_layout(&layout) {
-		Ok(parsed) => action.layout_parsed = Some(get_incremental_renderer(parsed, None)?),
+		Ok(parsed) => action.layout_parsed = Some(get_incremental_renderer_with_size(parsed, None, width, height)?),
 		Err(error) => {
 			action.layout_parsed = None;
 			bail!("Failed to load encoder layout {}: {}", load_layout, error)
