@@ -33,6 +33,7 @@ pub async fn create_instance(app: AppHandle, mut action: Action, context: Contex
 			current_state: 0,
 			settings: serde_json::Value::Object(serde_json::Map::new()),
 			children: None,
+			layout_image: None,
 		};
 		children.push(instance.clone());
 
@@ -52,7 +53,7 @@ pub async fn create_instance(app: AppHandle, mut action: Action, context: Contex
 		let slot = get_slot(&context, &locks).await?.clone();
 		Ok(slot)
 	} else {
-		let instance = ActionInstance {
+		let mut instance = ActionInstance {
 			action: action.clone(),
 			context: ActionContext::from_context(context.clone(), 0),
 			states: action.states.clone(),
@@ -63,7 +64,11 @@ pub async fn create_instance(app: AppHandle, mut action: Action, context: Contex
 			} else {
 				None
 			},
+			layout_image: None,
 		};
+		if context.controller == "Infobar" || context.controller == "Neo" {
+			instance.layout_image = crate::layout::render_infobar_preview(&instance);
+		}
 
 		*slot = Some(instance.clone());
 		let slot = slot.clone();
@@ -217,6 +222,11 @@ struct UpdateStateEvent {
 
 pub async fn update_state(app: &AppHandle, context: ActionContext, locks: &mut LocksMut<'_>) -> Result<(), anyhow::Error> {
 	let window = app.get_webview_window("main").unwrap();
+	if let Some(instance) = get_instance_mut(&context, locks).await? {
+		if instance.context.controller == "Infobar" || instance.context.controller == "Neo" {
+			instance.layout_image = crate::layout::render_infobar_preview(instance);
+		}
+	}
 	window.emit(
 		"update_state",
 		UpdateStateEvent {
