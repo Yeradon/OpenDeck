@@ -66,8 +66,8 @@ pub async fn create_instance(app: AppHandle, mut action: Action, context: Contex
 			},
 			layout_image: None,
 		};
-		if context.controller == "Infobar" || context.controller == "Neo" {
-			instance.layout_image = crate::layout::render_infobar_preview(&instance);
+		if supports_dynamic_layout(&context.controller) {
+			instance.layout_image = crate::layout::render_layout_preview(&instance);
 		}
 
 		*slot = Some(instance.clone());
@@ -223,8 +223,8 @@ struct UpdateStateEvent {
 pub async fn update_state(app: &AppHandle, context: ActionContext, locks: &mut LocksMut<'_>) -> Result<(), anyhow::Error> {
 	let window = app.get_webview_window("main").unwrap();
 	if let Some(instance) = get_instance_mut(&context, locks).await? {
-		if instance.context.controller == "Infobar" || instance.context.controller == "Neo" {
-			instance.layout_image = crate::layout::render_infobar_preview(instance);
+		if supports_dynamic_layout(&instance.context.controller) {
+			instance.layout_image = crate::layout::render_layout_preview(instance);
 		}
 	}
 	window.emit(
@@ -305,6 +305,18 @@ pub async fn trigger_virtual_press(context: Context) -> Result<(), Error> {
 			crate::events::inbound::devices::encoder_down(event()).await?;
 			tokio::time::sleep(std::time::Duration::from_millis(100)).await;
 			crate::events::inbound::devices::encoder_up(event()).await?;
+		}
+		"Touchstrip" => {
+			crate::events::inbound::devices::touchscreen_press(crate::events::inbound::PayloadEvent {
+				payload: crate::events::inbound::devices::TouchscreenPressPayload {
+					device: context.device.clone(),
+					position: context.position,
+					x: 100,
+					y: 50,
+					hold: false,
+				},
+			})
+			.await?;
 		}
 		_ => {}
 	}

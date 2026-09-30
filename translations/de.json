@@ -7,6 +7,7 @@
 	"device_view.grid_description": "Verwende die Pfeiltasten, um zwischen den Tasten zu navigieren. Bewegen auf eine Taste zeigt ihre Eigenschaften an.",
 	"device_view.key": "Taste",
 	"device_view.touchpoint": "Touchpunkt",
+	"device_view.touchstrip": "Touchstrip",
 	"dialog.no": "Nein",
 	"dialog.ok": "OK",
 	"dialog.yes": "Ja",

@@ -7,6 +7,7 @@
 	"device_view.grid_description": "Використовуйте клавіші зі стрілками для навігації між кнопками. Перехід до кнопки відображає інспектор властивостей.",
 	"device_view.key": "Кнопка",
 	"device_view.touchpoint": "Сенсорна точка",
+	"device_view.touchstrip": "Сенсорна смуга",
 	"dialog.no": "Ні",
 	"dialog.ok": "OK",
 	"dialog.yes": "Так",
