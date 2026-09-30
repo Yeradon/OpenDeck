@@ -7,6 +7,7 @@
 	"device_view.grid_description": "Använd piltangenterna för att navigera mellan knappar. När du flyttar till en knapp visas dess egenskapsinspektör.",
 	"device_view.key": "Knapp",
 	"device_view.touchpoint": "Pekpunkt",
+	"device_view.touchstrip": "Touchstrip",
 	"dialog.no": "Nej",
 	"dialog.ok": "OK",
 	"dialog.yes": "Ja",

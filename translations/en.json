@@ -7,6 +7,7 @@
 	"device_view.grid_description": "Use arrow keys to navigate between keys. Moving to a key will display its property inspector.",
 	"device_view.key": "Key",
 	"device_view.touchpoint": "Touch point",
+	"device_view.touchstrip": "Touchstrip",
 	"dialog.no": "No",
 	"dialog.ok": "OK",
 	"dialog.yes": "Yes",
