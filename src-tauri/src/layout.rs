@@ -89,19 +89,24 @@ pub async fn generate_infobar_image(context: &crate::shared::Context, fallback: 
 	}
 }
 
-pub fn render_infobar_preview(instance: &ActionInstance) -> Option<String> {
+pub fn render_layout_preview(instance: &ActionInstance) -> Option<String> {
 	let encoder = instance.action.encoder.as_ref()?;
 	if encoder.layout_parsed.is_none() {
 		return None;
 	}
 	let mut encoder_clone = encoder.clone();
 	let rendered = get_layout_image(&mut encoder_clone, instance).ok()?;
-	let mut canvas = RgbaImage::from_pixel(248, 58, Rgba([0, 0, 0, 255]));
-	overlay(&mut canvas, &rendered.to_rgba8(), 8, 4);
+	let img = if instance.context.controller == "Infobar" || instance.context.controller == "Neo" {
+		let mut canvas = RgbaImage::from_pixel(248, 58, Rgba([0, 0, 0, 255]));
+		overlay(&mut canvas, &rendered.to_rgba8(), 8, 4);
+		DynamicImage::ImageRgba8(canvas)
+	} else {
+		rendered
+	};
 
 	let mut bytes: Vec<u8> = Vec::new();
 	let mut cursor = std::io::Cursor::new(&mut bytes);
-	DynamicImage::ImageRgba8(canvas).to_rgb8().write_to(&mut cursor, image::ImageFormat::Jpeg).ok()?;
+	img.to_rgb8().write_to(&mut cursor, image::ImageFormat::Jpeg).ok()?;
 
 	use base64::Engine;
 	let encoded = base64::engine::general_purpose::STANDARD.encode(&bytes);

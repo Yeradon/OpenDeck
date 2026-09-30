@@ -85,11 +85,12 @@
 
 	$: gridRowLengths = [
 		...Array(device.rows).fill(device.columns),
-		...(device.encoders > 0 ? [device.encoders] : []),
+		...(device.encoders > 0 ? [device.encoders, device.encoders] : []),
 		...(device.touchpoints > 0 || device.infobars > 0 ? [device.touchpoints + device.infobars] : []),
 	];
-	$: encoderRowIndex = device.rows;
-	$: touchpointRowIndex = device.rows + (device.encoders > 0 ? 1 : 0);
+	$: touchstripRowIndex = device.rows;
+	$: encoderRowIndex = device.rows + (device.encoders > 0 ? 1 : 0);
+	$: touchpointRowIndex = device.rows + (device.encoders > 0 ? 2 : 0);
 	$: keypadRowWidth = device.columns * 132;
 
 	function flatIndexFromRowCol(row: number, col: number): number {
@@ -198,21 +199,48 @@
 			{/each}
 		</div>
 
-		<div class="flex flex-row justify-between" role="row" style={`width: ${keypadRowWidth}px;`}>
-			{#each { length: device.encoders } as _, i}
-				<Key
-					context={{ device: device.id, profile: profile.id, controller: "Encoder", position: i }}
-					bind:inslot={profile.sliders[i]}
-					on:dragover={handleDragOver}
-					on:drop={(event) => handleDrop(event, "Encoder", i)}
-					on:dragstart={(event) => handleDragStart(event, "Encoder", i)}
-					{handlePaste}
-					size={device.id.startsWith("sd-") && device.rows == 4 && device.columns == 8 ? 192 : 144}
-					label="{$t('device_view.encoder')} {i + 1}"
-					tabindex={focusedRow === encoderRowIndex && focusedCol === i ? 0 : -1}
-				/>
-			{/each}
-		</div>
+		{#if device.encoders > 0}
+			<!-- Touchstrip continuous bar above encoders -->
+			<div
+				class="flex flex-row items-center border-3 border-neutral-700 rounded-xl overflow-hidden bg-black my-2"
+				role="row"
+				style={`width: ${keypadRowWidth}px; height: ${(keypadRowWidth / device.encoders) / 2}px;`}
+			>
+				{#each { length: device.encoders } as _, i}
+					<Key
+						context={{ device: device.id, profile: profile.id, controller: "Encoder", position: i }}
+						bind:inslot={profile.sliders[i]}
+						on:dragover={handleDragOver}
+						on:drop={(event) => handleDrop(event, "Encoder", i)}
+						on:dragstart={(event) => handleDragStart(event, "Encoder", i)}
+						{handlePaste}
+						width={200}
+						height={100}
+						isTouchstrip
+						label="{$t('device_view.touchstrip')} {i + 1}"
+						tabindex={focusedRow === touchstripRowIndex && focusedCol === i ? 0 : -1}
+					/>
+				{/each}
+			</div>
+
+			<!-- Encoders row below touchstrip -->
+			<div class="flex flex-row justify-between items-center" role="row" style={`width: ${keypadRowWidth}px;`}>
+				{#each { length: device.encoders } as _, i}
+					<Key
+						context={{ device: device.id, profile: profile.id, controller: "Encoder", position: i }}
+						bind:inslot={profile.sliders[i]}
+						on:dragover={handleDragOver}
+						on:drop={(event) => handleDrop(event, "Encoder", i)}
+						on:dragstart={(event) => handleDragStart(event, "Encoder", i)}
+						{handlePaste}
+						size={device.id.startsWith("sd-") && device.rows == 4 && device.columns == 8 ? 192 : 144}
+						isDial
+						label="{$t('device_view.encoder')} {i + 1}"
+						tabindex={focusedRow === encoderRowIndex && focusedCol === i ? 0 : -1}
+					/>
+				{/each}
+			</div>
+		{/if}
 
 		<div class="flex flex-row items-center" role="row">
 			{#each { length: device.touchpoints } as _, i}

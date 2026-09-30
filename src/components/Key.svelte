@@ -39,6 +39,8 @@
 	export let active: boolean = true;
 	export let scale: number = 1;
 	export let isTouchPoint: boolean = false;
+	export let isTouchstrip: boolean = false;
+	export let isDial: boolean = false;
 	let pressed: boolean = false;
 
 	let state: ActionState | undefined;
@@ -160,11 +162,11 @@
 			try {
 				const ctx = canvas?.getContext("2d");
 				if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
-				if (active) await invoke("update_image", { context, image: null });
+				if (active && !isDial) await invoke("update_image", { context, image: null });
 			} finally {
 				unlock();
 			}
-		} else if (sl.layout_image) {
+		} else if (sl.layout_image && !isDial) {
 			const unlock = await lock.lock();
 			try {
 				const image = document.createElement("img");
@@ -179,7 +181,7 @@
 					ctx.clearRect(0, 0, canvas.width, canvas.height);
 					ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
 				}
-				if (active) await invoke("update_image", { context, image: canvas.toDataURL("image/jpeg") });
+				if (active && !isDial) await invoke("update_image", { context, image: canvas.toDataURL("image/jpeg") });
 			} catch (error) {
 				console.error(error);
 			} finally {
@@ -189,7 +191,7 @@
 			const unlock = await lock.lock();
 			try {
 				let fallback = sl.action.states[sl.current_state]?.image ?? sl.action.icon;
-				if (state) await renderImage(canvas, context, state, fallback, showOk, showAlert, true, active, pressed, $settings?.rotation);
+				if (state) await renderImage(canvas, context, state, fallback, showOk, showAlert, true, active && !isDial, pressed, $settings?.rotation);
 			} finally {
 				unlock();
 			}
@@ -206,52 +208,97 @@
 
 	async function triggerVirtualPress() {
 		if (!active || !context || !slot) return;
-		await invoke("trigger_virtual_press", { context });
+		if (isTouchstrip) {
+			await invoke("trigger_virtual_press", { context: { ...context, controller: "Touchstrip" } });
+		} else {
+			await invoke("trigger_virtual_press", { context });
+		}
 	}
 
 	$: accessibleLabel = label + (slot ? ": " + slot.action.name + (state?.show && state?.text ? " - " + state.text : "") : "");
 </script>
 
-<div class="relative" style={`transform: scale(${(112 /* desired inner size */ / size) * scale});`}>
-	<canvas
-		bind:this={canvas}
-		class="relative border-3 border-neutral-700 rounded-3xl outline-none outline-offset-2 outline-blue-500"
-		style={`margin: ${-((size + 3 * 2 /* border */ - 132) /* desired outer size */ / 2)}px;`}
+{#if isTouchstrip}
+	<div
+		class="relative flex-1 h-full cursor-pointer overflow-hidden"
+		class:outline-2={active && ((slot && $inspectedInstance == slot.context) || (context && $inspectedInstance == context))}
+		class:outline-blue-500={active && ((slot && $inspectedInstance == slot.context) || (context && $inspectedInstance == context))}
+		class:outline-offset-[-2px]={active && ((slot && $inspectedInstance == slot.context) || (context && $inspectedInstance == context))}
 		class:outline-solid={active && ((slot && $inspectedInstance == slot.context) || (context && $inspectedInstance == context))}
-		class:rounded-full!={context?.controller == "Encoder"}
-		class:rounded-lg!={context?.controller == "Infobar" || context?.controller == "Neo"}
-		class:bg-black={slot != null}
-		{width}
-		{height}
-		draggable={slot != null}
-		{tabindex}
-		{role}
-		aria-label={accessibleLabel}
-		on:dragstart
-		on:dragover
-		on:drop
-		on:click|stopPropagation={select}
-		on:dblclick|stopPropagation={triggerVirtualPress}
-		on:keydown={(e) => {
-			if (!active || !context) return;
-			if (e.key == "Enter") select(e);
-			else if (e.key == "F2") edit();
-			else if ((e.ctrlKey || e.metaKey) && e.key == "c") copy();
-			else if ((e.ctrlKey || e.metaKey) && e.key == "v") paste();
-			else if (e.key == "Delete") clear();
-			else if (e.key == "ContextMenu" || (e.shiftKey && e.key == "F10")) contextMenu(e);
-		}}
-		on:keyup|stopPropagation={(e) => {
-			if (!active || !context) return;
-			if (e.key == " ") select(e);
-		}}
-		on:focus={onfocus}
-		on:contextmenu={contextMenu}
-	/>
-	{#if isTouchPoint && !slot}
-		<div class="absolute left-1/4 top-1/2 w-1/2 border-t-4 border-neutral-700 pointer-events-none"></div>
-	{/if}
-</div>
+	>
+		<canvas
+			bind:this={canvas}
+			class="w-full h-full block bg-black"
+			{width}
+			{height}
+			draggable={slot != null}
+			{tabindex}
+			{role}
+			aria-label={accessibleLabel}
+			on:dragstart
+			on:dragover
+			on:drop
+			on:click|stopPropagation={select}
+			on:dblclick|stopPropagation={triggerVirtualPress}
+			on:keydown={(e) => {
+				if (!active || !context) return;
+				if (e.key == "Enter") select(e);
+				else if (e.key == "F2") edit();
+				else if ((e.ctrlKey || e.metaKey) && e.key == "c") copy();
+				else if ((e.ctrlKey || e.metaKey) && e.key == "v") paste();
+				else if (e.key == "Delete") clear();
+				else if (e.key == "ContextMenu" || (e.shiftKey && e.key == "F10")) contextMenu(e);
+			}}
+			on:keyup|stopPropagation={(e) => {
+				if (!active || !context) return;
+				if (e.key == " ") select(e);
+			}}
+			on:focus={onfocus}
+			on:contextmenu={contextMenu}
+		/>
+	</div>
+{:else}
+	<div class="relative" style={`transform: scale(${(112 /* desired inner size */ / size) * scale});`}>
+		<canvas
+			bind:this={canvas}
+			class="relative border-3 border-neutral-700 rounded-3xl outline-none outline-offset-2 outline-blue-500"
+			style={`margin: ${-((size + 3 * 2 /* border */ - 132) /* desired outer size */ / 2)}px;`}
+			class:outline-solid={active && ((slot && $inspectedInstance == slot.context) || (context && $inspectedInstance == context))}
+			class:rounded-full!={context?.controller == "Encoder"}
+			class:rounded-lg!={context?.controller == "Infobar" || context?.controller == "Neo"}
+			class:bg-black={slot != null}
+			{width}
+			{height}
+			draggable={slot != null}
+			{tabindex}
+			{role}
+			aria-label={accessibleLabel}
+			on:dragstart
+			on:dragover
+			on:drop
+			on:click|stopPropagation={select}
+			on:dblclick|stopPropagation={triggerVirtualPress}
+			on:keydown={(e) => {
+				if (!active || !context) return;
+				if (e.key == "Enter") select(e);
+				else if (e.key == "F2") edit();
+				else if ((e.ctrlKey || e.metaKey) && e.key == "c") copy();
+				else if ((e.ctrlKey || e.metaKey) && e.key == "v") paste();
+				else if (e.key == "Delete") clear();
+				else if (e.key == "ContextMenu" || (e.shiftKey && e.key == "F10")) contextMenu(e);
+			}}
+			on:keyup|stopPropagation={(e) => {
+				if (!active || !context) return;
+				if (e.key == " ") select(e);
+			}}
+			on:focus={onfocus}
+			on:contextmenu={contextMenu}
+		/>
+		{#if isTouchPoint && !slot}
+			<div class="absolute left-1/4 top-1/2 w-1/2 border-t-4 border-neutral-700 pointer-events-none"></div>
+		{/if}
+	</div>
+{/if}
 
 {#if $openContextMenu && $openContextMenu?.context == context}
 	<div
