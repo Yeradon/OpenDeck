@@ -68,6 +68,10 @@ pub async fn set_image(mut event: ContextAndPayloadEvent<SetImagePayload>) -> Re
 	let mut locks = acquire_locks_mut().await;
 
 	if let Some(instance) = get_instance_mut(&event.context, &mut locks).await? {
+		if instance.context.controller == "Neo" {
+			return Ok(());
+		}
+
 		if let Some(image) = &event.payload.image {
 			if image.trim().is_empty() {
 				event.payload.image = None;
@@ -104,15 +108,18 @@ pub async fn set_image(mut event: ContextAndPayloadEvent<SetImagePayload>) -> Re
 pub async fn set_feedback(event: ContextAndPayloadEvent<Value>) -> Result<(), anyhow::Error> {
 	let mut locks = acquire_locks_mut().await;
 
-	if let Some(instance) = get_instance_mut(&event.context, &mut locks).await?
-		&& let Some(encoder) = &mut instance.action.encoder
-	{
-		let Some(layout) = &mut encoder.layout_parsed else {
-			bail!("Layout is not loaded; cannot set feedback");
-		};
+	if let Some(instance) = get_instance_mut(&event.context, &mut locks).await? {
+		if !crate::shared::supports_dynamic_layout(&instance.context.controller) {
+			return Ok(());
+		}
+		if let Some(encoder) = &mut instance.action.encoder {
+			let Some(layout) = &mut encoder.layout_parsed else {
+				bail!("Layout is not loaded; cannot set feedback");
+			};
 
-		layout.set_feedback(event.payload)?;
-		update_state(crate::APP_HANDLE.get().unwrap(), instance.context.clone(), &mut locks).await?;
+			layout.set_feedback(event.payload)?;
+			update_state(crate::APP_HANDLE.get().unwrap(), instance.context.clone(), &mut locks).await?;
+		}
 	}
 
 	Ok(())
@@ -121,6 +128,9 @@ pub async fn set_feedback(event: ContextAndPayloadEvent<Value>) -> Result<(), an
 pub async fn set_feedback_layout(event: ContextAndPayloadEvent<SetFeedbackLayoutPayload>) -> Result<(), anyhow::Error> {
 	let mut locks = acquire_locks_mut().await;
 	if let Some(instance) = get_instance_mut(&event.context, &mut locks).await? {
+		if !crate::shared::supports_dynamic_layout(&instance.context.controller) {
+			return Ok(());
+		}
 		// We need to replace the existing parsed layout with the new one
 		let layout_name = event.payload.layout.clone();
 		crate::shared::initialise_layout(&mut instance.action, &instance.context.controller, Some(layout_name))?;

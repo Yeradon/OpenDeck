@@ -7,12 +7,23 @@ use tauri::{AppHandle, Emitter, Manager, command};
 use tokio::fs::remove_dir_all;
 
 #[command]
-pub async fn create_instance(app: AppHandle, mut action: Action, context: Context) -> Result<Option<ActionInstance>, Error> {
-	if !action.controllers.contains(&context.controller) {
+pub async fn create_instance(app: AppHandle, mut action: Action, mut context: Context) -> Result<Option<ActionInstance>, Error> {
+	if !action.supports_controller(&context.controller) {
 		return Ok(None);
 	}
 
-	if context.controller == "Encoder" {
+	let is_display_slot = |c: &str| c == "Display" || c == "Infobar" || c == "Neo";
+	if is_display_slot(&context.controller) {
+		if action.controllers.iter().any(|c| c == "Neo") {
+			context.controller = "Neo".to_string();
+		} else if action.controllers.iter().any(|c| c == "Infobar") {
+			context.controller = "Infobar".to_string();
+		} else {
+			return Ok(None);
+		}
+	}
+
+	if crate::shared::supports_dynamic_layout(&context.controller) {
 		let _ = crate::shared::initialise_layout(&mut action, &context.controller, None);
 	}
 
@@ -85,8 +96,14 @@ fn instance_images_dir(context: &ActionContext) -> std::path::PathBuf {
 
 #[command]
 pub async fn move_instance(source: Context, destination: Context, retain: bool) -> Result<Option<ActionInstance>, Error> {
-	if source.controller != destination.controller {
+	let is_display_slot = |c: &str| c == "Display" || c == "Infobar" || c == "Neo";
+	if source.controller != destination.controller && !(is_display_slot(&source.controller) && is_display_slot(&destination.controller)) {
 		return Ok(None);
+	}
+
+	let mut destination = destination;
+	if is_display_slot(&destination.controller) {
+		destination.controller = source.controller.clone();
 	}
 
 	{
