@@ -164,6 +164,27 @@
 			} finally {
 				unlock();
 			}
+		} else if (sl.layout_image) {
+			const unlock = await lock.lock();
+			try {
+				const image = document.createElement("img");
+				image.crossOrigin = "anonymous";
+				image.src = sl.layout_image;
+				await new Promise((resolve, reject) => {
+					image.onload = resolve;
+					image.onerror = reject;
+				});
+				const ctx = canvas?.getContext("2d");
+				if (ctx) {
+					ctx.clearRect(0, 0, canvas.width, canvas.height);
+					ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+				}
+				if (active) await invoke("update_image", { context, image: canvas.toDataURL("image/jpeg") });
+			} catch (error) {
+				console.error(error);
+			} finally {
+				unlock();
+			}
 		} else {
 			const unlock = await lock.lock();
 			try {
