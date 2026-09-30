@@ -52,6 +52,7 @@ pub async fn update_image(context: crate::shared::Context, image: Option<String>
 	if let Some(plugin) = DEVICE_NAMESPACES.read().await.get(&context.device[..2]) {
 		let image = match (context.controller.as_str(), image) {
 			("Encoder", Some(img)) => Some(to_encoder_jpeg_data_uri(&context, &img).await?),
+			("Neo", Some(img)) => Some(to_infobar_jpeg_data_uri(&context, &img).await?),
 			(_, img) => img,
 		};
 
@@ -78,6 +79,19 @@ async fn to_encoder_jpeg_data_uri(context: &crate::shared::Context, image: &str)
 	let bytes = base64::engine::general_purpose::STANDARD.decode(data)?;
 
 	let img = generate_encoder_image(context, &bytes).await?;
+
+	let mut buf = Vec::new();
+	img.write_to(&mut Cursor::new(&mut buf), ImageFormat::Jpeg)?;
+	let encoded = base64::engine::general_purpose::STANDARD.encode(&buf);
+
+	Ok(format!("data:image/jpeg;base64,{encoded}"))
+}
+
+async fn to_infobar_jpeg_data_uri(context: &crate::shared::Context, image: &str) -> Result<String, anyhow::Error> {
+	let data = image.split_once(',').unwrap().1;
+	let bytes = base64::engine::general_purpose::STANDARD.decode(data)?;
+
+	let img = crate::layout::generate_infobar_image(context, &bytes).await?;
 
 	let mut buf = Vec::new();
 	img.write_to(&mut Cursor::new(&mut buf), ImageFormat::Jpeg)?;
